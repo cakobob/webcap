@@ -1,188 +1,329 @@
-from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QListWidget, QPushButton,
-                             QHBoxLayout, QLabel, QListWidgetItem, QMenu,
-                             QInputDialog, QMessageBox, QLineEdit)
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QIcon
-from src.core.settings import SettingsManager
-from src.ui.settings_dialog import SettingsDialog
-from src.core.recorder import Recorder
-from src.utils.rename import safe_rename_video
+"""
+HomeView — main screen showing the recording library.
+"""
+
+from __future__ import annotations
+
 import os
 import time
+
 import cv2
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QPainterPath
+from PyQt6.QtCore import QRectF
+from PyQt6.QtSvg import QSvgRenderer
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
+
+from src.core.settings import SettingsManager
+from src.ui.components.video_card import VideoCardWidget
+from src.ui.settings_dialog import SettingsDialog
+from src.ui.styles import COLORS, RADIUS, SPACING, get_gradient_button_style
+from src.utils.rename import safe_rename_video
+from src.utils.resource_path import get_resource_path
+
 
 class HomeView(QWidget):
     start_recording_signal = pyqtSignal()
     play_video_signal = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(24, 24, 24, 24)
-        self.main_layout.setSpacing(16)
-        
-        # Header
-        self.header_layout = QHBoxLayout()
-        self.title = QLabel("WebCap")
-        self.title.setObjectName("title")
-        self.header_layout.addWidget(self.title)
-        self.header_layout.addStretch()
-        
-        self.settings_btn = QPushButton("⚙")
-        self.settings_btn.setMinimumWidth(44)
-        self.settings_btn.setMinimumHeight(44)
-        self.settings_btn.clicked.connect(self.open_settings)
-        self.header_layout.addWidget(self.settings_btn)
+        self.all_files: list[str] = []
+        self._duration_cache: dict[str, str] = {}
+        self._card_map: dict[str, VideoCardWidget] = {}
 
-        self.new_record_btn = QPushButton("+ New Recording")
-        self.new_record_btn.setObjectName("primary")
-        self.new_record_btn.setMinimumHeight(40)
-        self.new_record_btn.clicked.connect(self.on_new_recording_clicked)
-        self.header_layout.addWidget(self.new_record_btn)
-        
-        self.main_layout.addLayout(self.header_layout)
-        
-        # Logo (if exists)
-        from src.utils.resource_path import get_resource_path
-        logo_path = get_resource_path("assets/logos/webcap.png")
-        if os.path.exists(logo_path):
-            from PyQt6.QtGui import QPixmap, QPainter, QPainterPath
-            from PyQt6.QtCore import QRectF
-            self.logo_label = QLabel()
-            self.logo_label.setStyleSheet("border-radius: 12px; background-color: transparent;")
-            pixmap = QPixmap(logo_path)
-            scaled_pixmap = pixmap.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            
-            # Create rounded pixmap
-            rounded_pixmap = QPixmap(scaled_pixmap.size())
-            rounded_pixmap.fill(Qt.GlobalColor.transparent)
-            
-            painter = QPainter(rounded_pixmap)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            path = QPainterPath()
-            path.addRoundedRect(QRectF(rounded_pixmap.rect()), 12, 12)
-            painter.setClipPath(path)
-            painter.drawPixmap(0, 0, scaled_pixmap)
-            painter.end()
-            
-            self.logo_label.setPixmap(rounded_pixmap)
-            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.main_layout.addWidget(self.logo_label)
-        
-        # Search Box
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search recordings...")
-        self.search_box.setStyleSheet("""
-            QLineEdit {
-                background-color: #2a2a2a;
-                color: #FFFFFF;
-                border: 1px solid #333333;
-                border-radius: 8px;
-                padding: 8px 12px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border-color: #007AFF;
-            }
-        """)
-        self.search_box.textChanged.connect(self.filter_list)
-        self.main_layout.addWidget(self.search_box)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        # Video List Label
-        self.list_label = QLabel("Recent Recordings")
-        self.list_label.setObjectName("secondary")
-        font = QFont()
-        font.setPointSize(12)
-        font.setWeight(QFont.Weight.Medium)
-        self.list_label.setFont(font)
-        self.main_layout.addWidget(self.list_label)
-        
-        # Video List
-        self.video_list = QListWidget()
-        self.video_list.itemDoubleClicked.connect(self.on_item_double_clicked)
-        self.video_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.video_list.customContextMenuRequested.connect(self.show_context_menu)
-        self.main_layout.addWidget(self.video_list)
-        
-        # Empty State
-        self.empty_label = QLabel("No recordings yet.\nClick 'New Recording' to get started.")
-        self.empty_label.setObjectName("secondary")
-        self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        empty_font = QFont()
-        empty_font.setPointSize(14)
-        self.empty_label.setFont(empty_font)
-        self.empty_label.hide()
-        self.main_layout.addWidget(self.empty_label)
-        
-        self.all_files = []
-        self._duration_cache = {}  # {filepath: duration_str}
+        layout.addWidget(self._build_header())
+        layout.addWidget(self._build_content())
+
         self.refresh_list()
 
-    def on_new_recording_clicked(self):
-        # Request permissions here
+    # ------------------------------------------------------------------
+    # Header
+    # ------------------------------------------------------------------
+
+    def _build_header(self) -> QWidget:
+        header = QWidget()
+        header.setStyleSheet(f"""
+            background-color: {COLORS['bg_card']};
+            border-bottom: 1px solid {COLORS['border']};
+        """)
+        header.setFixedHeight(64)
+
+        row = QHBoxLayout(header)
+        row.setContentsMargins(SPACING['lg'], 0, SPACING['lg'], 0)
+        row.setSpacing(SPACING['sm'])
+
+        # Logo + title
+        logo_label = QLabel()
+        logo_label.setFixedSize(36, 36)
+        logo_label.setStyleSheet("background-color: transparent;")
+        logo_px = self._load_logo(36, 36)
+        if logo_px:
+            logo_label.setPixmap(logo_px)
+        row.addWidget(logo_label)
+
+        title = QLabel("WebCap")
+        title.setObjectName("title")
+        title.setStyleSheet(
+            f"color: {COLORS['text_primary']}; background: transparent; font-size: 20px; font-weight: 800;"
+        )
+        row.addWidget(title)
+
+        row.addSpacing(SPACING['md'])
+
+        # Search field
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("Search recordings…")
+        self.search_box.setFixedHeight(36)
+        self.search_box.setMinimumWidth(200)
+        self.search_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.search_box.textChanged.connect(self.filter_list)
+        row.addWidget(self.search_box, 1)
+
+        row.addSpacing(SPACING['sm'])
+
+        # Settings button
+        self.settings_btn = QPushButton("⚙")
+        self.settings_btn.setObjectName("icon_btn")
+        self.settings_btn.setFixedSize(36, 36)
+        self.settings_btn.setToolTip("Settings")
+        self.settings_btn.clicked.connect(self.open_settings)
+        row.addWidget(self.settings_btn)
+
+        # New Recording button
+        self.new_record_btn = QPushButton("+ New Recording")
+        self.new_record_btn.setFixedHeight(36)
+        self.new_record_btn.setStyleSheet(get_gradient_button_style())
+        self.new_record_btn.clicked.connect(self.on_new_recording_clicked)
+        row.addWidget(self.new_record_btn)
+
+        return header
+
+    def _load_logo(self, w: int, h: int):
+        """Load the new SVG logo or fall back to PNG, return a QPixmap or None."""
+        svg_path = get_resource_path("assets/logos/webcap_logo.svg")
+        png_path = get_resource_path("assets/logos/webcap_dark.png")
+
+        if os.path.exists(svg_path):
+            renderer = QSvgRenderer(svg_path)
+            if renderer.isValid():
+                px = QPixmap(w, h)
+                from PyQt6.QtGui import QColor
+                px.fill(QColor(0, 0, 0, 0))
+                painter = QPainter(px)
+                renderer.render(painter)
+                painter.end()
+                return px
+
+        if os.path.exists(png_path):
+            px = QPixmap(png_path).scaled(
+                w, h, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            return px
+
+        return None
+
+    # ------------------------------------------------------------------
+    # Content area
+    # ------------------------------------------------------------------
+
+    def _build_content(self) -> QWidget:
+        self._content_widget = QWidget()
+        self._content_widget.setStyleSheet(f"background-color: {COLORS['bg_main']};")
+        self._content_layout = QVBoxLayout(self._content_widget)
+        self._content_layout.setContentsMargins(SPACING['xl'], SPACING['lg'], SPACING['xl'], SPACING['lg'])
+        self._content_layout.setSpacing(SPACING['md'])
+
+        # Section row: title + counter badge
+        section_row = QHBoxLayout()
+        section_row.setContentsMargins(0, 0, 0, 0)
+        self.section_label = QLabel("Recent Recordings")
+        section_label_font = QFont()
+        section_label_font.setPointSize(11)
+        section_label_font.setWeight(QFont.Weight.DemiBold)
+        self.section_label.setFont(section_label_font)
+        self.section_label.setStyleSheet(f"color: {COLORS['text_secondary']}; background: transparent;")
+        section_row.addWidget(self.section_label)
+        section_row.addStretch()
+
+        self.count_badge = QLabel()
+        self.count_badge.setObjectName("badge")
+        section_row.addWidget(self.count_badge)
+        self._content_layout.addLayout(section_row)
+
+        # Scroll area with video cards
+        self._scroll_area = QScrollArea()
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll_area.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background-color: transparent;
+            }}
+            QWidget#scroll_content {{
+                background-color: transparent;
+            }}
+        """)
+
+        self._cards_container = QWidget()
+        self._cards_container.setObjectName("scroll_content")
+        self._cards_layout = QVBoxLayout(self._cards_container)
+        self._cards_layout.setContentsMargins(0, 0, 0, 0)
+        self._cards_layout.setSpacing(SPACING['sm'])
+        self._cards_layout.addStretch()
+
+        self._scroll_area.setWidget(self._cards_container)
+        self._content_layout.addWidget(self._scroll_area, 1)
+
+        # Empty state (hidden initially)
+        self._empty_widget = self._build_empty_state()
+        self._content_layout.addWidget(self._empty_widget)
+        self._empty_widget.hide()
+
+        return self._content_widget
+
+    def _build_empty_state(self) -> QWidget:
+        w = QWidget()
+        w.setStyleSheet("background-color: transparent;")
+        layout = QVBoxLayout(w)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.setSpacing(SPACING['sm'])
+
+        # Webcam icon — render from SVG or show unicode fallback
+        icon_label = QLabel()
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setStyleSheet("background: transparent;")
+        icon_svg = get_resource_path("assets/icons/webcam.svg")
+        if os.path.exists(icon_svg):
+            renderer = QSvgRenderer(icon_svg)
+            if renderer.isValid():
+                px = QPixmap(64, 64)
+                from PyQt6.QtGui import QColor
+                px.fill(QColor(0, 0, 0, 0))
+                p = QPainter(px)
+                renderer.render(p)
+                p.end()
+                icon_label.setPixmap(px)
+        else:
+            icon_label.setText("📷")
+            icon_label.setStyleSheet(f"font-size: 48px; color: {COLORS['text_muted']}; background: transparent;")
+        layout.addWidget(icon_label)
+
+        layout.addSpacing(SPACING['sm'])
+
+        msg = QLabel("No recordings yet")
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setStyleSheet(f"font-size: 16px; font-weight: 600; color: {COLORS['text_secondary']}; background: transparent;")
+        layout.addWidget(msg)
+
+        hint = QLabel("Click the button above to start a new recording")
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        hint.setStyleSheet(f"font-size: 13px; color: {COLORS['text_muted']}; background: transparent;")
+        layout.addWidget(hint)
+
+        layout.addSpacing(SPACING['md'])
+
+        empty_btn = QPushButton("+ New Recording")
+        empty_btn.setFixedSize(200, 40)
+        empty_btn.setStyleSheet(get_gradient_button_style())
+        empty_btn.clicked.connect(self.on_new_recording_clicked)
+        layout.addWidget(empty_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        return w
+
+    # ------------------------------------------------------------------
+    # Slots / actions
+    # ------------------------------------------------------------------
+
+    def on_new_recording_clicked(self) -> None:
         self.request_permissions()
         self.start_recording_signal.emit()
 
-    def request_permissions(self):
-        # Camera permission check (by trying to open it)
+    def request_permissions(self) -> None:
         settings = SettingsManager.load_settings()
         cam_idx = settings.get("camera_index", 0)
         cap = cv2.VideoCapture(cam_idx)
         if cap.isOpened():
             cap.release()
-        
-        # Microphone permission check (using sounddevice)
+
         try:
             import sounddevice as sd
             with sd.InputStream(samplerate=44100, channels=1):
                 pass
-        except Exception as e:
-            print(f"Microphone permission check failed: {e}")
+        except Exception:
+            pass
 
-    def open_settings(self):
+    def open_settings(self) -> None:
         dialog = SettingsDialog(self)
         dialog.exec()
-        self.refresh_list() # Refresh list after settings closed
+        self.refresh_list()
 
-    def refresh_list(self):
-        # Clear existing items
-        self.video_list.clear()
-        
+    # ------------------------------------------------------------------
+    # List management
+    # ------------------------------------------------------------------
+
+    def refresh_list(self) -> None:
         settings = SettingsManager.load_settings()
         save_dir = settings.get("save_dir", os.path.expanduser("~/Movies"))
-        
+
         if not os.path.exists(save_dir):
-            self.show_empty_state()
+            self._show_empty_state()
             return
 
         self.all_files = sorted(
-            [f for f in os.listdir(save_dir) if f.lower().endswith(('.mp4', '.mkv', '.mov'))],
+            [
+                f for f in os.listdir(save_dir)
+                if f.lower().endswith(('.mp4', '.mkv', '.mov'))
+            ],
             key=lambda x: os.path.getmtime(os.path.join(save_dir, x)),
-            reverse=True
+            reverse=True,
         )
-        
-        if not self.all_files:
-            self.show_empty_state()
-            return
-        
-        self.empty_label.hide()
-        self.list_label.show()
-        self.video_list.show()
-        self.search_box.show()
-        
-        self.populate_list(self.all_files)
 
-    def populate_list(self, files):
-        self.video_list.clear()
+        if not self.all_files:
+            self._show_empty_state()
+            return
+
+        self._show_list_state()
+        self._populate_cards(self.all_files)
+
+    def _populate_cards(self, files: list[str]) -> None:
+        """Rebuild the card list from *files* (filenames only)."""
         settings = SettingsManager.load_settings()
         save_dir = settings.get("save_dir", os.path.expanduser("~/Movies"))
-        
-        for f in files:
-            path = os.path.join(save_dir, f)
+
+        # Remove existing cards (keep the trailing stretch)
+        while self._cards_layout.count() > 1:
+            item = self._cards_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        self._card_map.clear()
+
+        for filename in files:
+            path = os.path.join(save_dir, filename)
+            if not os.path.exists(path):
+                continue
+
             size_mb = os.path.getsize(path) / (1024 * 1024)
             date_str = time.strftime('%b %d, %Y  %H:%M', time.localtime(os.path.getmtime(path)))
-            
-            # Get duration (cached to avoid re-opening the same file)
+
+            # Duration (cached)
             if path in self._duration_cache:
                 duration_str = self._duration_cache[path]
             else:
@@ -193,58 +334,55 @@ class HomeView(QWidget):
                         fps = cap.get(cv2.CAP_PROP_FPS)
                         frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
                         if fps > 0:
-                            duration_sec = int(frame_count / fps)
-                            mins, secs = divmod(duration_sec, 60)
-                            duration_str = f" • {mins:02d}:{secs:02d}"
+                            secs = int(frame_count / fps)
+                            m, s = divmod(secs, 60)
+                            duration_str = f"{m:02d}:{s:02d}"
                         cap.release()
                 except Exception:
                     pass
                 self._duration_cache[path] = duration_str
 
-            item_text = f"{f}\n{size_mb:.1f} MB{duration_str}  •  {date_str}"
-            item = QListWidgetItem(item_text)
-            item.setData(Qt.ItemDataRole.UserRole, path)
-            self.video_list.addItem(item)
+            card = VideoCardWidget()
+            card.set_video_data(path, filename, size_mb, duration_str, date_str)
 
-    def filter_list(self, text):
-        filtered_files = [f for f in self.all_files if text.lower() in f.lower()]
-        self.populate_list(filtered_files)
+            card.play_requested.connect(self.play_video_signal.emit)
+            card.rename_requested.connect(self._on_rename_requested)
+            card.delete_requested.connect(self._on_delete_requested)
 
-    def show_empty_state(self):
-        self.video_list.hide()
-        self.list_label.hide()
-        self.search_box.hide()
-        self.empty_label.show()
+            self._cards_layout.insertWidget(self._cards_layout.count() - 1, card)
+            self._card_map[path] = card
 
-    def on_item_double_clicked(self, item):
-        path = item.data(Qt.ItemDataRole.UserRole)
-        self.play_video_signal.emit(path)
+        count = len(files)
+        self.count_badge.setText(f"{count} video{'s' if count != 1 else ''}")
 
-    def show_context_menu(self, pos):
-        item = self.video_list.itemAt(pos)
-        if not item:
-            return
-            
-        menu = QMenu()
-        play_action = menu.addAction("▶ Play")
-        rename_action = menu.addAction("✏ Rename")
-        delete_action = menu.addAction("🗑 Delete")
-        
-        action = menu.exec(self.video_list.mapToGlobal(pos))
-        
-        path = item.data(Qt.ItemDataRole.UserRole)
-        
-        if action == play_action:
-            self.play_video_signal.emit(path)
-        elif action == rename_action:
-            self.rename_video(item, path)
-        elif action == delete_action:
-            self.delete_video(item, path)
+    def filter_list(self, text: str) -> None:
+        filtered = [f for f in self.all_files if text.lower() in f.lower()]
+        if filtered or not text:
+            self._show_list_state()
+            self._populate_cards(filtered if text else self.all_files)
+        else:
+            # Show empty state only if there are normally recordings
+            self._populate_cards([])
 
-    def rename_video(self, item, path):
+    def _show_empty_state(self) -> None:
+        self._scroll_area.hide()
+        self.section_label.hide()
+        self.count_badge.hide()
+        self._empty_widget.show()
+
+    def _show_list_state(self) -> None:
+        self._empty_widget.hide()
+        self._scroll_area.show()
+        self.section_label.show()
+        self.count_badge.show()
+
+    # ------------------------------------------------------------------
+    # Rename / delete handlers (called from VideoCardWidget signals)
+    # ------------------------------------------------------------------
+
+    def _on_rename_requested(self, path: str) -> None:
         old_name = os.path.basename(path)
-        new_name, ok = QInputDialog.getText(self, "Rename Video", "New Name:", text=old_name)
-
+        new_name, ok = QInputDialog.getText(self, "Rename Video", "New name:", text=old_name)
         if ok and new_name:
             try:
                 safe_rename_video(path, new_name)
@@ -252,13 +390,12 @@ class HomeView(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Could not rename file: {e}")
 
-    def delete_video(self, item, path):
+    def _on_delete_requested(self, path: str) -> None:
         confirm = QMessageBox.question(
-            self, "Delete Video", 
+            self, "Delete Video",
             f"Are you sure you want to delete\n{os.path.basename(path)}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        
         if confirm == QMessageBox.StandardButton.Yes:
             try:
                 os.remove(path)

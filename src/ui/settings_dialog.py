@@ -1,164 +1,263 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QLineEdit, QPushButton, QFileDialog, QHBoxLayout, QSpinBox, QFormLayout, QCheckBox, QComboBox
+"""
+SettingsDialog — application settings grouped in visual sections.
+All styling is inherited from GLOBAL_STYLESHEET; no inline setStyleSheet.
+"""
+
+from __future__ import annotations
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
 from src.core.settings import SettingsManager
+from src.ui.styles import COLORS, RADIUS, SPACING, get_gradient_button_style
+
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setGeometry(200, 200, 400, 300)
-        
+        self.setMinimumSize(480, 560)
+        self.resize(480, 600)
+
         self.settings = SettingsManager.load_settings()
-        self.main_layout = QVBoxLayout(self)
-        self.form_layout = QFormLayout()
-        
-        # Save Directory
-        self.dir_layout = QHBoxLayout()
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        # Title bar
+        outer.addWidget(self._build_title_bar())
+
+        # Scrollable content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("border: none;")
+
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(SPACING['lg'], SPACING['md'], SPACING['lg'], SPACING['md'])
+        content_layout.setSpacing(SPACING['md'])
+
+        content_layout.addWidget(self._build_storage_section())
+        content_layout.addWidget(self._build_recording_section())
+        content_layout.addWidget(self._build_timing_section())
+        content_layout.addStretch()
+
+        scroll.setWidget(content)
+        outer.addWidget(scroll, 1)
+
+        # Save button
+        outer.addWidget(self._build_save_bar())
+
+    # ------------------------------------------------------------------
+    # Sub-builders
+    # ------------------------------------------------------------------
+
+    def _build_title_bar(self) -> QWidget:
+        bar = QWidget()
+        bar.setStyleSheet(
+            f"background-color: {COLORS['bg_card']}; "
+            f"border-bottom: 1px solid {COLORS['border']};"
+        )
+        bar.setFixedHeight(56)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(SPACING['lg'], 0, SPACING['lg'], 0)
+
+        title = QLabel("Settings")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        f = QFont()
+        f.setPointSize(15)
+        f.setWeight(QFont.Weight.Bold)
+        title.setFont(f)
+        title.setStyleSheet(f"color: {COLORS['text_primary']}; background: transparent;")
+        row.addWidget(title)
+
+        return bar
+
+    def _build_storage_section(self) -> QGroupBox:
+        box = QGroupBox("STORAGE")
+        form = QFormLayout(box)
+        form.setContentsMargins(SPACING['sm'], SPACING['md'], SPACING['sm'], SPACING['sm'])
+        form.setSpacing(SPACING['md'])
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        dir_row = QHBoxLayout()
+        dir_row.setSpacing(SPACING['sm'])
         self.dir_input = QLineEdit(self.settings.get("save_dir", ""))
-        self.browse_btn = QPushButton("Browse")
-        self.browse_btn.clicked.connect(self.browse_directory)
-        self.dir_layout.addWidget(self.dir_input)
-        self.dir_layout.addWidget(self.browse_btn)
-        self.form_layout.addRow("Save Directory:", self.dir_layout)
-        
-        # Start Delay
+        self.dir_input.setPlaceholderText("/Users/…/Movies")
+        browse_btn = QPushButton("Browse")
+        browse_btn.setFixedWidth(80)
+        browse_btn.setFixedHeight(34)
+        browse_btn.clicked.connect(self._browse_directory)
+        dir_row.addWidget(self.dir_input)
+        dir_row.addWidget(browse_btn)
+
+        form.addRow(self._field_label("Save Directory"), dir_row)
+        return box
+
+    def _build_recording_section(self) -> QGroupBox:
+        from src.core.recorder import Recorder
+
+        box = QGroupBox("RECORDING")
+        form = QFormLayout(box)
+        form.setContentsMargins(SPACING['sm'], SPACING['md'], SPACING['sm'], SPACING['sm'])
+        form.setSpacing(SPACING['md'])
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        # Camera
+        self.camera_combo = QComboBox()
+        for idx, name in Recorder.get_available_cameras():
+            self.camera_combo.addItem(name, idx)
+        cur_cam = self.settings.get("camera_index", 0)
+        i = self.camera_combo.findData(cur_cam)
+        if i >= 0:
+            self.camera_combo.setCurrentIndex(i)
+        form.addRow(self._field_label("Camera"), self.camera_combo)
+
+        # Microphone
+        self.mic_combo = QComboBox()
+        self.mic_combo.addItem("Default", None)
+        for idx, name in Recorder.get_available_microphones():
+            self.mic_combo.addItem(name, idx)
+        cur_mic = self.settings.get("mic_index", None)
+        i = self.mic_combo.findData(cur_mic)
+        if i >= 0:
+            self.mic_combo.setCurrentIndex(i)
+        form.addRow(self._field_label("Microphone"), self.mic_combo)
+
+        # Resolution
+        self.res_combo = QComboBox()
+        self.res_combo.addItems(["1920x1080", "1280x720", "640x480"])
+        self.res_combo.setCurrentText(self.settings.get("resolution", "1280x720"))
+        form.addRow(self._field_label("Resolution"), self.res_combo)
+
+        # Format
+        self.format_combo = QComboBox()
+        self.format_combo.addItems(["mp4", "mkv", "mov"])
+        self.format_combo.setCurrentText(self.settings.get("video_format", "mp4"))
+        form.addRow(self._field_label("Format"), self.format_combo)
+
+        # Aspect ratio
+        self.ar_combo = QComboBox()
+        self.ar_combo.addItems(["Default", "16:9", "4:3", "1:1"])
+        self.ar_combo.setCurrentText(self.settings.get("aspect_ratio", "Default"))
+        form.addRow(self._field_label("Aspect Ratio"), self.ar_combo)
+
+        return box
+
+    def _build_timing_section(self) -> QGroupBox:
+        box = QGroupBox("TIMING")
+        form = QFormLayout(box)
+        form.setContentsMargins(SPACING['sm'], SPACING['md'], SPACING['sm'], SPACING['sm'])
+        form.setSpacing(SPACING['md'])
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        # Start delay
         self.delay_spin = QSpinBox()
         self.delay_spin.setRange(0, 60)
         self.delay_spin.setSuffix(" sec")
         self.delay_spin.setValue(self.settings.get("start_delay", 0))
-        self.form_layout.addRow("Start Delay:", self.delay_spin)
-        
-        # Auto-stop Duration
-        self.autostop_layout = QHBoxLayout()
-        self.autostop_check = QCheckBox("Enable Auto-stop")
+        form.addRow(self._field_label("Start Delay"), self.delay_spin)
+
+        # Auto-stop
+        autostop_row = QHBoxLayout()
+        autostop_row.setSpacing(SPACING['sm'])
+
+        self.autostop_check = QCheckBox("Enable")
         self.autostop_check.setChecked(self.settings.get("auto_stop_enabled", False))
-        self.autostop_check.toggled.connect(self.toggle_autostop)
-        
+        self.autostop_check.toggled.connect(self._toggle_autostop)
+
         self.autostop_spin = QSpinBox()
-        self.autostop_spin.setRange(0, 120)
+        self.autostop_spin.setRange(1, 120)
         self.autostop_spin.setSuffix(" min")
-        self.autostop_spin.setValue(self.settings.get("auto_stop_duration", 0))
+        self.autostop_spin.setValue(self.settings.get("auto_stop_duration", 0) or 1)
         self.autostop_spin.setEnabled(self.autostop_check.isChecked())
-        
-        self.autostop_layout.addWidget(self.autostop_check)
-        self.autostop_layout.addWidget(self.autostop_spin)
-        self.form_layout.addRow("Auto-stop:", self.autostop_layout)
 
-        # --- Quality & Source ---
-        from src.core.recorder import Recorder
+        autostop_row.addWidget(self.autostop_check)
+        autostop_row.addWidget(self.autostop_spin)
+        autostop_row.addStretch()
 
-        # Camera Source
-        self.camera_combo = QComboBox()
-        cameras = Recorder.get_available_cameras()
-        for idx, name in cameras:
-            self.camera_combo.addItem(name, idx)
-        # Set current index
-        current_cam = self.settings.get("camera_index", 0)
-        idx = self.camera_combo.findData(current_cam)
-        if idx >= 0: self.camera_combo.setCurrentIndex(idx)
-        self.form_layout.addRow("Camera:", self.camera_combo)
+        form.addRow(self._field_label("Auto-stop"), autostop_row)
 
-        # Microphone Source
-        self.mic_combo = QComboBox()
-        mics = Recorder.get_available_microphones()
-        self.mic_combo.addItem("Default", None)
-        for idx, name in mics:
-            self.mic_combo.addItem(name, idx)
-        # Set current index
-        current_mic = self.settings.get("mic_index", None)
-        idx = self.mic_combo.findData(current_mic)
-        if idx >= 0: self.mic_combo.setCurrentIndex(idx)
-        self.form_layout.addRow("Microphone:", self.mic_combo)
+        return box
 
-        # Resolution
-        self.res_combo = QComboBox()
-        resolutions = ["1920x1080", "1280x720", "640x480"]
-        self.res_combo.addItems(resolutions)
-        self.res_combo.setCurrentText(self.settings.get("resolution", "1280x720"))
-        self.form_layout.addRow("Resolution:", self.res_combo)
+    def _build_save_bar(self) -> QWidget:
+        bar = QWidget()
+        bar.setStyleSheet(
+            f"background-color: {COLORS['bg_card']}; "
+            f"border-top: 1px solid {COLORS['border']};"
+        )
+        bar.setFixedHeight(64)
 
-        # Video Format
-        self.format_combo = QComboBox()
-        formats = ["mp4", "mkv", "mov"]
-        self.format_combo.addItems(formats)
-        self.format_combo.setCurrentText(self.settings.get("video_format", "mp4"))
-        self.form_layout.addRow("Format:", self.format_combo)
+        row = QHBoxLayout(bar)
+        row.setContentsMargins(SPACING['lg'], SPACING['sm'], SPACING['lg'], SPACING['sm'])
 
-        # Aspect Ratio
-        self.ar_combo = QComboBox()
-        ratios = ["Default", "16:9", "4:3", "1:1"]
-        self.ar_combo.addItems(ratios)
-        self.ar_combo.setCurrentText(self.settings.get("aspect_ratio", "Default"))
-        self.form_layout.addRow("Aspect Ratio:", self.ar_combo)
-        
-        self.main_layout.addLayout(self.form_layout)
-
-        # Save Button
-        self.save_btn = QPushButton("Save")
+        self.save_btn = QPushButton("Save Settings")
+        self.save_btn.setFixedHeight(44)
+        self.save_btn.setStyleSheet(get_gradient_button_style())
         self.save_btn.clicked.connect(self.save_and_close)
-        self.main_layout.addWidget(self.save_btn)
+        row.addWidget(self.save_btn)
 
-        # Stylesheet for ComboBox and CheckBox
-        from src.utils.resource_path import get_resource_path
-        check_icon_path = get_resource_path("assets/icons/check.svg").replace("\\", "/")
-        
-        self.setStyleSheet(f"""
-            QComboBox {{
-                padding: 5px;
-                min-height: 25px;
-                min-width: 150px;
-                border: 1px solid #555;
-                border-radius: 4px;
-                background-color: #333;
-                color: white;
-            }}
-            QComboBox::drop-down {{
-                border: none;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: #333;
-                color: white;
-                selection-background-color: #555;
-            }}
-            QCheckBox {{
-                color: white;
-                spacing: 8px;
-            }}
-            QCheckBox::indicator {{
-                width: 18px;
-                height: 18px;
-                border: 1px solid #666;
-                border-radius: 4px;
-                background-color: #333;
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: #333;
-                border: 1px solid #007AFF;
-                image: url({check_icon_path});
-            }}
-        """)
+        return bar
 
-    def browse_directory(self):
+    @staticmethod
+    def _field_label(text: str) -> QLabel:
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            f"color: {COLORS['text_secondary']}; background: transparent; font-size: 13px;"
+        )
+        return lbl
+
+    # ------------------------------------------------------------------
+    # Slots
+    # ------------------------------------------------------------------
+
+    def _browse_directory(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, "Select Save Directory")
         if directory:
             self.dir_input.setText(directory)
 
-    def toggle_autostop(self, checked):
+    def _toggle_autostop(self, checked: bool) -> None:
         self.autostop_spin.setEnabled(checked)
 
-    def save_and_close(self):
+    def save_and_close(self) -> None:
         new_settings = {
             "save_dir": self.dir_input.text(),
             "start_delay": self.delay_spin.value(),
             "auto_stop_enabled": self.autostop_check.isChecked(),
-            "auto_stop_duration": self.autostop_spin.value(),
+            "auto_stop_duration": self.autostop_spin.value() if self.autostop_check.isChecked() else 0,
             "resolution": self.res_combo.currentText(),
             "camera_index": self.camera_combo.currentData(),
             "mic_index": self.mic_combo.currentData(),
             "video_format": self.format_combo.currentText(),
-            "aspect_ratio": self.ar_combo.currentText()
+            "aspect_ratio": self.ar_combo.currentText(),
         }
         SettingsManager.save_settings(new_settings)
         self.accept()
 
-    def get_settings(self):
+    def get_settings(self) -> dict:
         return SettingsManager.load_settings()
+
+    # Backward-compatibility aliases
+    def browse_directory(self) -> None:
+        self._browse_directory()
+
+    def toggle_autostop(self, checked: bool) -> None:
+        self._toggle_autostop(checked)
