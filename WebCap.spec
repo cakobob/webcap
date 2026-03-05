@@ -49,7 +49,7 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='WebCap.app',
-    icon='assets/logos/webcap.png',
+    icon='assets/logos/webcap_dark.png',
     bundle_identifier='com.webcap.recorder',
     info_plist={
         'NSCameraUsageDescription': 'WebCap needs access to your camera to record video.',

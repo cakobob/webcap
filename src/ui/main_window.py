@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         candidates = [
             "assets/logos/webcap_dark.png",
             "assets/logos/webcap_logo.svg",
-            "assets/logos/webcap.png",
+            "assets/logos/webcap_logo.svg",
         ]
         for rel in candidates:
             path = get_resource_path(rel)

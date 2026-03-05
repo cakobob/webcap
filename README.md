@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/logos/webcap.png" alt="WebCap Logo" width="128" height="128">
+<img src="assets/logos/webcap_dark.png" alt="WebCap Logo" width="128" height="128">
 
 # WebCap
 
