@@ -1,0 +1,7 @@
+PyQt6
+opencv-python
+imageio-ffmpeg
+sounddevice
+soundfile
+numpy
+Pillow
