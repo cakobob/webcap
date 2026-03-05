@@ -59,7 +59,7 @@ GLOBAL_STYLESHEET = f"""
 QWidget {{
     background-color: {COLORS['bg_main']};
     color: {COLORS['text_primary']};
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     font-size: 13px;
 }}
 

@@ -40,11 +40,16 @@ class Recorder:
         """
         available_cameras = []
         for i in range(5):
-            cap = cv2.VideoCapture(i)
-            if cap.isOpened():
-                backend = cap.getBackendName()
-                available_cameras.append((i, f"Camera {i} ({backend})"))
-                cap.release()
+            try:
+                cap = cv2.VideoCapture(i, cv2.CAP_AVFOUNDATION)
+                if cap.isOpened():
+                    backend = cap.getBackendName()
+                    available_cameras.append((i, f"Camera {i} ({backend})"))
+                    cap.release()
+                else:
+                    break
+            except Exception:
+                break
         return available_cameras
 
     @staticmethod
