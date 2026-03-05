@@ -16,10 +16,7 @@ Record webcam video with audio, manage your recordings, and play them back — a
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)
 
-<!--
-Add screenshots here:
-![WebCap Screenshot](docs/screenshots/home.png)
--->
+![Home](assets/screenshoots/home.png)
 
 </div>
 
@@ -30,6 +27,14 @@ Add screenshots here:
 QuickTime can't do countdown timers or auto-stop. OBS is overkill for a simple webcam recording. Command-line FFmpeg requires memorizing flags every time.
 
 **WebCap fills the gap** — a focused tool that does one thing well: record your webcam with audio, quickly and reliably.
+
+---
+
+## Screenshots
+
+| Recording | Playback | Settings |
+|:---------:|:--------:|:--------:|
+| ![Record](assets/screenshoots/record.png) | ![Replay](assets/screenshoots/replay.png) | ![Settings](assets/screenshoots/settings.png) |
 
 ---
 
