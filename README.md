@@ -73,7 +73,9 @@ QuickTime can't do countdown timers or auto-stop. OBS is overkill for a simple w
 
 ### Option A: Download (End Users)
 
-> Coming soon — check [Releases](../../releases) for `.app` bundles.
+Download the latest `.app` bundle from [Releases](../../releases), unzip, and drag to your Applications folder.
+
+> On first launch, right-click the app and select **Open** to bypass Gatekeeper.
 
 ### Option B: Run from Source (Developers)
 
