@@ -255,8 +255,6 @@ Tests cover settings management, file rename logic, recorder initialization, and
 ## Known Limitations
 
 - **macOS only** — the build pipeline, codec (`avc1`), and permission handling are macOS-specific
-- **30 FPS fixed** — frame rate is not configurable via the UI
-- **Mono audio** — stereo recording is not supported
 - **Max 5 cameras** — devices above index 4 are not detected
 - **No multi-profile** — settings are global, stored in a single JSON file
 
