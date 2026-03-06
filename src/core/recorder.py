@@ -151,6 +151,26 @@ class Recorder:
         if audio_channels is not None:
             self.channels = audio_channels
         
+        # Check device capabilities and adjust channels if needed
+        device = mic_index if mic_index is not None else None
+        try:
+            if device is not None:
+                device_info = sd.query_devices(device)
+                max_channels = device_info['max_input_channels']
+            else:
+                default_input = sd.default.device[0] if sd.default.device else None
+                if default_input is not None:
+                    device_info = sd.query_devices(default_input)
+                    max_channels = device_info['max_input_channels']
+                else:
+                    max_channels = 2
+            
+            if self.channels > max_channels:
+                print(f"Warning: Device only supports {max_channels} channel(s), adjusting from {self.channels} to {max_channels}")
+                self.channels = max_channels
+        except Exception as e:
+            print(f"Could not query device capabilities: {e}")
+        
         self.final_filename = filename
         
         # Video Setup
@@ -171,7 +191,6 @@ class Recorder:
         # Audio Setup
         self.audio_frames = []
         try:
-            device = mic_index if mic_index is not None else None
             self.audio_stream = sd.InputStream(
                 device=device,
                 samplerate=self.sample_rate, 
