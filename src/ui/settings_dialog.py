@@ -172,6 +172,16 @@ class SettingsDialog(QDialog):
             self.fps_combo.setCurrentText("30 fps")
         form.addRow(self._field_label("Frame Rate"), self.fps_combo)
 
+        # Audio Channels (Mono/Stereo)
+        self.audio_channels_combo = QComboBox()
+        self.audio_channels_combo.addItems(["Mono (1 channel)", "Stereo (2 channels)"])
+        current_channels = self.settings.get("audio_channels", 1)
+        if current_channels == 2:
+            self.audio_channels_combo.setCurrentIndex(1)
+        else:
+            self.audio_channels_combo.setCurrentIndex(0)
+        form.addRow(self._field_label("Audio Channels"), self.audio_channels_combo)
+
         return box
 
     def _build_timing_section(self) -> QGroupBox:
@@ -254,6 +264,9 @@ class SettingsDialog(QDialog):
         fps_text = self.fps_combo.currentText()
         fps_value = int(fps_text.split()[0])
         
+        # Parse audio channels (Mono = 1, Stereo = 2)
+        audio_channels_value = 2 if self.audio_channels_combo.currentIndex() == 1 else 1
+        
         new_settings = {
             "save_dir": self.dir_input.text(),
             "start_delay": self.delay_spin.value(),
@@ -265,6 +278,7 @@ class SettingsDialog(QDialog):
             "video_format": self.format_combo.currentText(),
             "aspect_ratio": self.ar_combo.currentText(),
             "fps": fps_value,
+            "audio_channels": audio_channels_value,
         }
         SettingsManager.save_settings(new_settings)
         self.accept()

@@ -338,7 +338,8 @@ class RecorderView(QWidget):
         filename = os.path.join(save_dir, f"WebCap_{timestamp}.{video_format}")
 
         mic_index = settings.get("mic_index", None)
-        self.recorder.start_recording(filename, mic_index=mic_index)
+        audio_channels = settings.get("audio_channels", 1)
+        self.recorder.start_recording(filename, mic_index=mic_index, audio_channels=audio_channels)
 
         # Update UI
         self.start_btn.setEnabled(True)

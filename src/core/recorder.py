@@ -26,7 +26,7 @@ class Recorder:
         
         self.final_filename = ""
         self.sample_rate = 44100
-        self.channels = 1 # Mono mic usually
+        self.channels = 1 # Default mono, can be overridden via settings
         
         self.target_aspect_ratio = None # (width, height) tuple or None
         self.crop_rect = None # (x, y, w, h)
@@ -143,9 +143,13 @@ class Recorder:
             print(status)
         self.audio_frames.append(indata.copy())
 
-    def start_recording(self, filename="output.mp4", mic_index=None):
+    def start_recording(self, filename="output.mp4", mic_index=None, audio_channels=None):
         if not self.cap:
             return
+        
+        # Set audio channels (mono or stereo)
+        if audio_channels is not None:
+            self.channels = audio_channels
         
         self.final_filename = filename
         

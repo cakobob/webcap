@@ -13,6 +13,7 @@ class SettingsManager:
         "video_format": "mp4",
         "aspect_ratio": "Default",  # Default, 16:9, 4:3, 1:1
         "fps": 30,  # 15, 24, 30, 60
+        "audio_channels": 1,  # 1 = Mono, 2 = Stereo
     }
     
     SETTINGS_FILE = os.path.expanduser("~/.webcap_settings.json")
