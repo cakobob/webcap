@@ -160,6 +160,18 @@ class SettingsDialog(QDialog):
         self.ar_combo.setCurrentText(self.settings.get("aspect_ratio", "Default"))
         form.addRow(self._field_label("Aspect Ratio"), self.ar_combo)
 
+        # Frame Rate
+        self.fps_combo = QComboBox()
+        self.fps_combo.addItems(["15 fps", "24 fps", "30 fps", "60 fps"])
+        current_fps = self.settings.get("fps", 30)
+        fps_text = f"{current_fps} fps"
+        fps_index = self.fps_combo.findText(fps_text)
+        if fps_index >= 0:
+            self.fps_combo.setCurrentIndex(fps_index)
+        else:
+            self.fps_combo.setCurrentText("30 fps")
+        form.addRow(self._field_label("Frame Rate"), self.fps_combo)
+
         return box
 
     def _build_timing_section(self) -> QGroupBox:
@@ -238,6 +250,10 @@ class SettingsDialog(QDialog):
         self.autostop_spin.setEnabled(checked)
 
     def save_and_close(self) -> None:
+        # Parse FPS from combo box text (e.g., "30 fps" -> 30)
+        fps_text = self.fps_combo.currentText()
+        fps_value = int(fps_text.split()[0])
+        
         new_settings = {
             "save_dir": self.dir_input.text(),
             "start_delay": self.delay_spin.value(),
@@ -248,6 +264,7 @@ class SettingsDialog(QDialog):
             "mic_index": self.mic_combo.currentData(),
             "video_format": self.format_combo.currentText(),
             "aspect_ratio": self.ar_combo.currentText(),
+            "fps": fps_value,
         }
         SettingsManager.save_settings(new_settings)
         self.accept()

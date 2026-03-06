@@ -30,6 +30,7 @@ class Recorder:
         
         self.target_aspect_ratio = None # (width, height) tuple or None
         self.crop_rect = None # (x, y, w, h)
+        self.target_fps = 30 # Default FPS, can be overridden via settings
 
     @staticmethod
     def get_available_cameras():
@@ -69,7 +70,7 @@ class Recorder:
             print(f"Error listing microphones: {e}")
         return devices
 
-    def start_camera(self, camera_index=0, resolution="1280x720", aspect_ratio="Default"):
+    def start_camera(self, camera_index=0, resolution="1280x720", aspect_ratio="Default", fps=30):
         if self.cap:
             self.cap.release()
             
@@ -86,6 +87,9 @@ class Recorder:
             
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        self.cap.set(cv2.CAP_PROP_FPS, fps)
+        
+        self.target_fps = fps
         
         # Calculate crop rect based on aspect ratio
         actual_w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -156,7 +160,7 @@ class Recorder:
             width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-        fps = 30.0 
+        fps = getattr(self, 'target_fps', 30.0)
         
         self.out = cv2.VideoWriter(self.temp_video, fourcc, fps, (width, height))
         

@@ -47,6 +47,7 @@ QuickTime can't do countdown timers or auto-stop. OBS is overkill for a simple w
 - **Real-time aspect ratio crop** — Default, 16:9, 4:3, or 1:1, applied live before encoding
 - **Multiple formats** — MP4, MKV, or MOV output
 - **Multiple resolutions** — 1080p, 720p, or 480p
+- **Configurable frame rate** — 15, 24, 30, or 60 FPS
 - **Live recording indicator** — blinking red dot + running timer
 
 ### Video Management
@@ -138,6 +139,7 @@ Settings are stored in `~/.webcap_settings.json` and can be changed via the Sett
 | Resolution | 1920x1080, 1280x720, 640x480 | 1280x720 |
 | Video Format | MP4, MKV, MOV | MP4 |
 | Aspect Ratio | Default, 16:9, 4:3, 1:1 | Default |
+| Frame Rate | 15, 24, 30, 60 FPS | 30 |
 | Start Delay | 0–60 seconds | 0 |
 | Auto-stop | 0–120 minutes | Disabled |
 
@@ -246,7 +248,6 @@ Tests cover settings management, file rename logic, recorder initialization, and
 ## Roadmap
 
 - [ ] Cross-platform support (Windows, Linux)
-- [ ] Configurable frame rate
 - [ ] Stereo audio recording
 - [ ] Video thumbnails in the library
 - [ ] Hotkey to start/stop recording
@@ -269,7 +270,6 @@ Contributions are welcome! Here's how to get started:
 
 - Add Windows/Linux codec auto-detection in `recorder.py`
 - Add video thumbnails to the home view list
-- Add configurable FPS in settings
 - Implement stereo audio recording
 
 ---

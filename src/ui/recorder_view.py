@@ -207,10 +207,11 @@ class RecorderView(QWidget):
         cam_idx = settings.get("camera_index", 0)
         resolution = settings.get("resolution", "1280x720")
         aspect_ratio = settings.get("aspect_ratio", "Default")
+        fps = settings.get("fps", 30)
 
         self.video_label.setText("Initializing Camera…")
         if self.recorder.start_camera(
-            camera_index=cam_idx, resolution=resolution, aspect_ratio=aspect_ratio
+            camera_index=cam_idx, resolution=resolution, aspect_ratio=aspect_ratio, fps=fps
         ):
             self._frame_timer.start(30)
         else:

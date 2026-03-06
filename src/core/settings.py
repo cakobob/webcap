@@ -12,6 +12,7 @@ class SettingsManager:
         "mic_index": None,  # None means default
         "video_format": "mp4",
         "aspect_ratio": "Default",  # Default, 16:9, 4:3, 1:1
+        "fps": 30,  # 15, 24, 30, 60
     }
     
     SETTINGS_FILE = os.path.expanduser("~/.webcap_settings.json")
