@@ -127,6 +127,21 @@ The built app will be in `dist/WebCap.app`.
 
 ---
 
+## Keyboard Shortcuts
+
+### Recorder View
+- **Space** — Start/Stop recording (toggle)
+- **ESC** — Cancel countdown or go back to home
+- **Cmd+,** — Open Settings (macOS)
+
+### Player View
+- **Space** — Play/Pause video
+- **←** — Skip back 10 seconds
+- **→** — Skip forward 10 seconds
+- **ESC** — Go back to home
+
+---
+
 ## Configuration
 
 Settings are stored in `~/.webcap_settings.json` and can be changed via the Settings dialog.

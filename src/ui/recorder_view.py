@@ -18,7 +18,7 @@ from PyQt6.QtCore import (
     QTimer,
     pyqtSignal,
 )
-from PyQt6.QtGui import QFont, QImage, QPixmap
+from PyQt6.QtGui import QFont, QImage, QPixmap, QKeyEvent
 from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect,
     QHBoxLayout,
@@ -69,6 +69,9 @@ class RecorderView(QWidget):
         # Frame update timer
         self._frame_timer = QTimer()
         self._frame_timer.timeout.connect(self.update_frame)
+
+        # Enable keyboard focus for shortcuts
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     # ------------------------------------------------------------------
     # Layout builders
@@ -463,3 +466,34 @@ class RecorderView(QWidget):
     # Kept for backward compatibility — blink_status was public in old code
     def blink_status(self) -> None:
         pass
+
+    # ------------------------------------------------------------------
+    # Keyboard shortcuts
+    # ------------------------------------------------------------------
+
+    def keyPressEvent(self, a0) -> None:
+        """Handle keyboard shortcuts."""
+        key = a0.key()
+        modifiers = a0.modifiers()
+
+        # Space: Toggle recording (start/stop)
+        if key == Qt.Key.Key_Space:
+            if self.start_btn.isEnabled():
+                self.toggle_recording()
+            return
+
+        # ESC: Cancel countdown OR go back
+        if key == Qt.Key.Key_Escape:
+            # If countdown is active, cancel it
+            if self._countdown_timer is not None:
+                self.cancel_countdown()
+            # If recording, stop it
+            elif self.recorder.is_recording:
+                self.stop_recording_ui()
+            # Otherwise, go back
+            elif self.back_btn.isEnabled():
+                self.on_back_clicked()
+            return
+
+        # Call parent implementation for unhandled keys
+        super().keyPressEvent(a0)
