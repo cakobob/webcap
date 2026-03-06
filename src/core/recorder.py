@@ -226,6 +226,7 @@ class Recorder:
         cmd = [
             ffmpeg_exe,
             '-y',
+            '-loglevel', 'error',
             '-i', self.temp_video,
             '-i', self.temp_audio,
             '-c:v', 'copy',
